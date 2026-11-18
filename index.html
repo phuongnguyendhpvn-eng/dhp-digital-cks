@@ -57,6 +57,22 @@ function configured(){return SUPABASE_URL.startsWith("https://")&&!SUPABASE_URL.
 if(configured()&&window.supabase) sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);
 function esc(s=""){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
 function money(n){return Number(n||0).toLocaleString("vi-VN")+"đ"}
+function durationMonths(p){
+ const source=String((p&&p.duration)||"")+" "+String((p&&p.name)||"");
+ const s=source.toLowerCase().normalize("NFD").replace(/[\\u0300-\\u036f]/g,"");
+ const month=s.match(/(\\d+(?:[.,]\\d+)?)\\s*(thang|th|month|months)\\b/);
+ if(month)return Number(month[1].replace(",",".")); 
+ const year=s.match(/(\\d+(?:[.,]\\d+)?)\\s*(nam|year|years)\\b/);
+ if(year)return Number(year[1].replace(",","."))*12;
+ return Number.POSITIVE_INFINITY;
+}
+function sortPackages(items){
+ return [...items].sort((a,b)=>{
+  const da=durationMonths(a),db=durationMonths(b);
+  if(da!==db)return da-db;
+  return String(a.name||"").localeCompare(String(b.name||""),"vi");
+ });
+}
 function demo(){products=[
 { id:"d1",provider:"Viettel-CA",name:"Gói 1 năm",kind:"new",duration:"12 tháng",price:1200000,description:"Đăng ký mới chữ ký số Viettel-CA."},
 { id:"d2",provider:"Viettel-CA",name:"Gói 3 năm",kind:"new",duration:"36 tháng",price:2200000,description:"Gói sử dụng dài hạn."},
@@ -72,7 +88,7 @@ async function loadData(){
 function render(){
  const q=$("search").value.toLowerCase(), kind=$("kind").value;
  const data=products.filter(p=>(!kind||p.kind===kind)&&[p.provider,p.name,p.description].join(" ").toLowerCase().includes(q));
- $("shelves").innerHTML=DEFAULT_PROVIDERS.map(provider=>{const list=data.filter(p=>p.provider===provider);if(!list.length)return "";const logoDomains={"Viettel-CA":"viettel-ca.vn","VNPT-CA":"vnpt-ca.vn","FPT-CA":"fpt-is.com","EasyCA":"easyca.vn","NewCA":"newtel-ca.vn","FastCA":"fastca.vn"};const logo=logoDomains[provider];return '<section class="provider"><div class="provider-head"><div class="provider-logo-wrap"><img class="provider-logo" src="https://www.google.com/s2/favicons?domain='+logo+'&sz=128" alt="Logo '+esc(provider)+'" loading="lazy"></div><h2>'+esc(provider)+'</h2></div><div class="cards">'+list.map(p=>'<article class="book" tabindex="0" role="button" aria-label="Xem giá '+esc(p.name)+'" onclick="this.classList.toggle(\'flipped\')" onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();this.classList.toggle(\'flipped\')}"><div class="book-inner"><div class="face front"><div><span class="tag">'+(p.kind==="renew"?"Gia hạn":"Đăng ký mới")+'</span><h3>'+esc(p.name)+'</h3><p>'+esc(p.description||"Dịch vụ chữ ký số chính hãng.")+'</p></div><span class="hint">Nhấn để xem giá ↗</span></div><div class="face back"><div><span class="tag">'+esc(p.duration||"Gói dịch vụ")+'</span><h3>'+esc(p.name)+'</h3><div class="price">'+money(p.price)+'</div><p>'+esc(p.description||"Liên hệ để được tư vấn.")+'</p></div><span class="hint">Nhấn để lật lại</span></div></div></article>').join("")+'</div></section>'}).join("")||'<div class="empty">Không tìm thấy gói dịch vụ phù hợp.</div>';
+ $("shelves").innerHTML=DEFAULT_PROVIDERS.map(provider=>{const list=sortPackages(data.filter(p=>p.provider===provider));if(!list.length)return "";const logoDomains={"Viettel-CA":"viettel-ca.vn","VNPT-CA":"vnpt-ca.vn","FPT-CA":"fpt-is.com","EasyCA":"easyca.vn","NewCA":"newtel-ca.vn","FastCA":"fastca.vn"};const logo=logoDomains[provider];return '<section class="provider"><div class="provider-head"><div class="provider-logo-wrap"><img class="provider-logo" src="https://www.google.com/s2/favicons?domain='+logo+'&sz=128" alt="Logo '+esc(provider)+'" loading="lazy"></div><h2>'+esc(provider)+'</h2></div><div class="cards">'+list.map(p=>'<article class="book" tabindex="0" role="button" aria-label="Xem giá '+esc(p.name)+'" onclick="this.classList.toggle(\'flipped\')" onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();this.classList.toggle(\'flipped\')}"><div class="book-inner"><div class="face front"><div><span class="tag">'+(p.kind==="renew"?"Gia hạn":"Đăng ký mới")+'</span><h3>'+esc(p.name)+'</h3><p>'+esc(p.description||"Dịch vụ chữ ký số chính hãng.")+'</p></div><span class="hint">Nhấn để xem giá ↗</span></div><div class="face back"><div><span class="tag">'+esc(p.duration||"Gói dịch vụ")+'</span><h3>'+esc(p.name)+'</h3><div class="price">'+money(p.price)+'</div><p>'+esc(p.description||"Liên hệ để được tư vấn.")+'</p></div><span class="hint">Nhấn để lật lại</span></div></div></article>').join("")+'</div></section>'}).join("")||'<div class="empty">Không tìm thấy gói dịch vụ phù hợp.</div>';
  $("newsList").innerHTML=posts.length?posts.map(n=>'<article class="news-item"><h3>'+esc(n.title)+'</h3><p>'+esc(n.body)+'</p></article>').join(""):'<p class="muted">Chưa có tin mới.</p>';
 }
 $("search").addEventListener("input",render);$("kind").addEventListener("change",render);
@@ -81,7 +97,7 @@ $("loginBtn").onclick=async()=>{if(!sb){$("loginMsg").textContent="Bro cần c�
 async function checkAdmin(){if(!sb)return;const {data}=await sb.auth.getSession();if(!data.session){isAdmin=false;showAdmin();return}const {data:adm,error}=await sb.from("admins").select("user_id").eq("user_id",data.session.user.id).maybeSingle();isAdmin=!!adm&&!error;showAdmin();if(isAdmin)await loadAdmin();else{$("loginMsg").textContent="Tài khoản chưa được cấp quyền Admin trong bảng admins.";await sb.auth.signOut()}}
 function showAdmin(){$("loginBox").hidden=isAdmin;$("adminBox").hidden=!isAdmin}
 $("logoutBtn").onclick=async()=>{await sb.auth.signOut();isAdmin=false;showAdmin()};
-async function loadAdmin(){const {data}=await sb.from("products").select("*").order("provider");$("adminProducts").innerHTML=(data||[]).map(p=>'<div class="admin-row"><span><b>'+esc(p.provider)+'</b> · '+esc(p.name)+' — '+money(p.price)+'</span><span><button class="small" onclick="editProduct(\''+p.id+'\')">Sửa</button> <button class="small danger" onclick="deleteProduct(\''+p.id+'\')">Xóa</button></span></div>').join("")||"Chưa có gói dịch vụ."}
+async function loadAdmin(){const {data}=await sb.from("products").select("*").order("provider");$("adminProducts").innerHTML=sortPackages(data||[]).map(p=>'<div class="admin-row"><span><b>'+esc(p.provider)+'</b> · '+esc(p.name)+' — '+money(p.price)+'</span><span><button class="small" onclick="editProduct(\''+p.id+'\')">Sửa</button> <button class="small danger" onclick="deleteProduct(\''+p.id+'\')">Xóa</button></span></div>').join("")||"Chưa có gói dịch vụ."}
 window.editProduct=id=>{const p=products.find(x=>x.id===id);if(!p)return;editingId=id;$("pProvider").value=p.provider;$("pKind").value=p.kind;$("pName").value=p.name;$("pDuration").value=p.duration||"";$("pPrice").value=p.price;$("pDescription").value=p.description||""};
 $("cancelEdit").onclick=()=>{editingId=null;["pName","pDuration","pPrice","pDescription"].forEach(id=>$(id).value="")};
 $("saveProduct").onclick=async()=>{if(!isAdmin)return;const item={provider:$("pProvider").value,kind:$("pKind").value,name:$("pName").value.trim(),duration:$("pDuration").value.trim(),price:Number($("pPrice").value),description:$("pDescription").value.trim(),active:true};if(!item.name||!item.price){$("adminMsg").textContent="Vui lòng nhập tên gói và giá hợp lệ.";return}const res=editingId?await sb.from("products").update(item).eq("id",editingId):await sb.from("products").insert(item);$("adminMsg").textContent=res.error?res.error.message:"Đã lưu gói dịch vụ.";if(!res.error){editingId=null;await loadData();await loadAdmin()}};
